@@ -18,7 +18,9 @@ Because there are no dependencies, the file can be hosted on any static file hos
 
 ## Git Workflow
 
-This project uses Git + GitHub for version control. After every meaningful change:
+**Commit and push after every piece of work — no exceptions.** This ensures we never lose progress and can always roll back to a working state.
+
+Remote: `https://github.com/emijoreyes64/dragon-dojo-scheduler`
 
 ```bash
 git add martial-arts-scheduler.html
@@ -26,7 +28,24 @@ git commit -m "short imperative description of what changed"
 git push
 ```
 
-Remote: `https://github.com/emijoreyes64/dragon-dojo-scheduler`
+### When to commit
+
+- After completing any feature or improvement, even small ones
+- After fixing a bug
+- Before starting a new task (so the current working state is saved)
+- Any time a feature is "working" — don't wait until everything is perfect
+
+### Commit message format
+
+Use short imperative phrases that describe *what changed and why*, not *what you did*:
+
+```
+Add student enrollment count to class detail modal
+Fix resize handle snapping on fractional pixel positions
+Change week view scroll height to account for sticky header
+```
+
+Avoid vague messages like `update`, `fix stuff`, or `changes`.
 
 ## Architecture
 
