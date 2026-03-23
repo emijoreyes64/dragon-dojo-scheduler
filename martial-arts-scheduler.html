@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Dragon Dojo — Class Scheduler</title>
+  <style>
+    :root {
+      --bg:        #0d0d0d;
+      --surface:   #161616;
+      --card:      #1e1e1e;
+      --border:    #2a2a2a;
+      --accent:    #c8102e;
+      --accent2:   #e84c3d;
+      --gold:      #d4a017;
+      --text:      #f0f0f0;
+      --muted:     #888;
+      --radius:    8px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; user-select: none; }
+
+    /* ── Header ── */
+    header {
+      background: var(--surface); border-bottom: 2px solid var(--accent);
+      padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 64px;
+    }
+    .logo { display: flex; align-items: center; gap: 12px; }
+    .logo-icon { font-size: 28px; }
+    .logo-text { font-size: 20px; font-weight: 700; letter-spacing: 1px; }
+    .logo-text span { color: var(--accent); }
+    header nav { display: flex; gap: 8px; }
+    .nav-btn {
+      background: none; border: 1px solid var(--border); color: var(--muted);
+      padding: 7px 16px; border-radius: var(--radius); cursor: pointer;
+      font-size: 13px; font-weight: 600; letter-spacing: .5px; transition: all .2s;
+    }
+    .nav-btn:hover, .nav-btn.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-add {
+      background: var(--accent); border: none; color: #fff;
+      padding: 8px 18px; border-radius: var(--radius); cursor: pointer;
+      font-size: 13px; font-weight: 700; letter-spacing: .5px; transition: all .2s;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .btn-add:hover { background: var(--accent2); }
+
+    /* ── Layout ── */
+    .app { display: flex; height: calc(100vh - 64px); }
+    .sidebar {
+      width: 260px; background: var(--surface); border-right: 1px solid var(--border);
+      padding: 20px 16px; overflow-y: auto; flex-shrink: 0;
+    }
+    .main { flex: 1; overflow: auto; padding: 24px; min-width: 0; }
+
+    /* ── Sidebar ── */
+    .sidebar h3 { font-size: 11px; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; margin-bottom: 12px; }
+    .mini-cal { margin-bottom: 28px; }
+    .mini-cal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .mini-cal-title { font-size: 14px; font-weight: 600; }
+    .mini-nav { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 16px; padding: 2px 6px; border-radius: 4px; }
+    .mini-nav:hover { color: var(--text); background: var(--border); }
+    .mini-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+    .mini-dow { font-size: 10px; color: var(--muted); padding: 3px 0; font-weight: 600; }
+    .mini-day {
+      font-size: 12px; padding: 4px 2px; border-radius: 50%; cursor: pointer;
+      transition: background .15s; line-height: 1.6; aspect-ratio: 1;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .mini-day:hover { background: var(--border); }
+    .mini-day.other-month { color: var(--border); }
+    .mini-day.today { background: var(--accent); color: #fff; font-weight: 700; }
+    .mini-day.selected { outline: 2px solid var(--gold); outline-offset: 1px; }
+    .mini-day.has-class::after { content: '•'; display: block; font-size: 8px; color: var(--gold); margin-top: -4px; line-height: 1; }
+
+    .filter-section { margin-bottom: 20px; }
+    .filter-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 7px 10px; border-radius: 6px; cursor: pointer;
+      margin-bottom: 4px; transition: background .15s;
+    }
+    .filter-item:hover { background: var(--card); }
+    .filter-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .filter-label { font-size: 13px; flex: 1; }
+    .filter-count { font-size: 11px; color: var(--muted); background: var(--border); padding: 1px 6px; border-radius: 10px; }
+    .filter-item input[type=checkbox] { width: 14px; height: 14px; accent-color: var(--accent); cursor: pointer; }
+
+    .legend-item { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .level-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 700; letter-spacing: .5px; }
+    .lvl-beginner     { background: #1a3a1a; color: #4caf50; }
+    .lvl-intermediate { background: #3a2a00; color: #ffa000; }
+    .lvl-advanced     { background: #3a0a0a; color: #e53935; }
+    .lvl-all          { background: #1a1a3a; color: #7986cb; }
+
+    /* ── Week view — new structure ── */
+    .week-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .week-title { font-size: 22px; font-weight: 700; }
+    .week-title span { color: var(--accent); }
+    .week-controls { display: flex; gap: 8px; align-items: center; }
+    .ctrl-btn {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      width: 34px; height: 34px; border-radius: 6px; cursor: pointer;
+      font-size: 16px; display: flex; align-items: center; justify-content: center; transition: all .15s;
+    }
+    .ctrl-btn:hover { border-color: var(--accent); color: var(--accent); }
+    .today-btn {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      padding: 7px 14px; border-radius: 6px; cursor: pointer; font-size: 12px;
+      font-weight: 600; transition: all .15s;
+    }
+    .today-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .drag-hint {
+      font-size: 11px; color: var(--muted); margin-bottom: 10px; display: flex; align-items: center; gap: 6px;
+    }
+    .drag-hint span { background: var(--card); border: 1px solid var(--border); border-radius: 4px; padding: 2px 8px; }
+
+    /* Week grid wrapper */
+    .wk-wrapper {
+      border: 1px solid var(--border); border-radius: var(--radius);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    /* Sticky header */
+    .wk-header {
+      display: flex; background: var(--card);
+      border-bottom: 1px solid var(--border); flex-shrink: 0;
+    }
+    .wk-corner { width: 60px; flex-shrink: 0; border-right: 1px solid var(--border); }
+    .wk-day-hdr {
+      flex: 1; text-align: center; padding: 12px 4px;
+      border-right: 1px solid var(--border);
+    }
+    .wk-day-hdr:last-child { border-right: none; }
+    .wk-dow { font-size: 10px; color: var(--muted); font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+    .wk-date-num { font-size: 18px; font-weight: 700; margin-top: 2px; }
+    .wk-day-hdr.today-col .wk-date-num {
+      background: var(--accent); color: #fff; border-radius: 50%;
+      width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+      margin: 2px auto 0;
+    }
+    /* Scrollable body */
+    .wk-body-scroll { overflow-y: auto; max-height: calc(100vh - 220px); }
+    .wk-body { display: flex; }
+    /* Time label column */
+    .wk-time-col { width: 60px; flex-shrink: 0; border-right: 1px solid var(--border); }
+    .wk-time-lbl {
+      height: 52px; display: flex; align-items: flex-start; justify-content: flex-end;
+      padding: 4px 8px 0; font-size: 10px; color: var(--muted); border-bottom: 1px solid var(--border);
+    }
+    .wk-time-lbl:last-child { border-bottom: none; }
+    /* Day columns */
+    .wk-cols { flex: 1; display: flex; min-width: 0; }
+    .wk-day-col {
+      flex: 1; position: relative; border-right: 1px solid var(--border);
+      min-width: 0;
+    }
+    .wk-day-col:last-child { border-right: none; }
+    .wk-bg-cell {
+      height: 52px; border-bottom: 1px solid var(--border);
+      box-sizing: border-box; pointer-events: none;
+    }
+    .wk-bg-cell:last-child { border-bottom: none; }
+    .wk-bg-half {
+      position: absolute; left: 0; right: 0; border-top: 1px dashed #1e1e1e;
+      pointer-events: none;
+    }
+    /* Drop target highlight */
+    .wk-day-col.drop-target { background: rgba(200,16,46,0.07); }
+    .wk-day-col.drop-target::after {
+      content: ''; position: absolute; inset: 0; border: 2px solid rgba(200,16,46,0.3);
+      pointer-events: none;
+    }
+
+    /* ── Class blocks ── */
+    .class-block {
+      position: absolute; left: 2px; right: 2px;
+      border-radius: 5px; overflow: hidden;
+      font-size: 11px; z-index: 1;
+      box-shadow: 0 2px 6px rgba(0,0,0,.4);
+      transition: box-shadow .15s;
+    }
+    .class-block:not(.dragging):not(.resizing) { transition: box-shadow .15s, opacity .15s; }
+    .class-block.dragging { opacity: 0.35; z-index: 0; }
+    .class-block.resizing { z-index: 20; }
+
+    .cb-body {
+      padding: 4px 6px; cursor: grab; height: calc(100% - 8px);
+      overflow: hidden;
+    }
+    .cb-body:active { cursor: grabbing; }
+    .cb-body:hover { filter: brightness(1.12); }
+    .cb-name { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .cb-sub { font-size: 10px; opacity: .8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+    .cb-time { font-size: 10px; opacity: .7; margin-top: 1px; }
+
+    /* Resize handle */
+    .resize-handle {
+      position: absolute; bottom: 0; left: 4px; right: 4px; height: 8px;
+      cursor: ns-resize; border-radius: 0 0 4px 4px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .resize-handle::after {
+      content: ''; width: 20px; height: 2px;
+      background: rgba(255,255,255,0.45); border-radius: 2px;
+      transition: width .15s, background .15s;
+    }
+    .resize-handle:hover::after { width: 32px; background: rgba(255,255,255,0.8); }
+
+    /* ── Drag ghost ── */
+    .drag-ghost {
+      position: fixed; pointer-events: none; z-index: 9999;
+      border-radius: 5px; padding: 5px 7px; font-size: 11px;
+      box-shadow: 0 8px 24px rgba(0,0,0,.6); opacity: 0.9;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+    .drag-ghost .cb-name { font-weight: 700; color: #fff; }
+    .drag-ghost .cb-sub  { font-size: 10px; opacity: .8; color: #fff; }
+
+    /* ── Time tooltip during drag ── */
+    .drag-tooltip {
+      position: fixed; pointer-events: none; z-index: 10000;
+      background: #000; color: #fff; font-size: 11px; font-weight: 700;
+      padding: 3px 8px; border-radius: 4px; white-space: nowrap;
+      border: 1px solid var(--accent); letter-spacing: .5px;
+    }
+
+    /* ── Snap line ── */
+    .snap-line {
+      position: absolute; left: 0; right: 0; height: 2px;
+      background: var(--accent); z-index: 50; pointer-events: none;
+      border-radius: 1px;
+    }
+
+    /* ── Discipline colors ── */
+    .cb-karate    { background: #c62828; color: #fff; }
+    .cb-judo      { background: #1565c0; color: #fff; }
+    .cb-bjj       { background: #2e7d32; color: #fff; }
+    .cb-kickboxing{ background: #e65100; color: #fff; }
+    .cb-taichi    { background: #6a1b9a; color: #fff; }
+    .cb-muaythai  { background: #bf360c; color: #fff; }
+    .cb-wrestling { background: #33691e; color: #fff; }
+    .cb-kendo     { background: #006064; color: #fff; }
+
+    /* ── Month view ── */
+    .month-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr);
+      border-left: 1px solid var(--border); border-top: 1px solid var(--border);
+      border-radius: var(--radius); overflow: hidden;
+    }
+    .month-dow-header {
+      background: var(--card); text-align: center; padding: 10px;
+      font-size: 11px; font-weight: 700; letter-spacing: 1px; color: var(--muted);
+      text-transform: uppercase; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+    }
+    .month-cell {
+      background: var(--surface); border-right: 1px solid var(--border); border-bottom: 1px solid var(--border);
+      min-height: 110px; padding: 8px; cursor: pointer; transition: background .15s;
+    }
+    .month-cell:hover { background: var(--card); }
+    .month-cell.other-month { opacity: .35; }
+    .month-cell.today-cell { outline: 2px solid var(--accent); outline-offset: -2px; }
+    .month-cell.selected-cell { background: #1a0a0a; }
+    .mc-date {
+      font-size: 13px; font-weight: 700; width: 26px; height: 26px;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 50%; margin-bottom: 6px;
+    }
+    .today-cell .mc-date { background: var(--accent); color: #fff; }
+    .mc-class-pill {
+      font-size: 10px; padding: 2px 6px; border-radius: 4px; margin-bottom: 3px;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      cursor: pointer; font-weight: 600;
+    }
+    .mc-more { font-size: 10px; color: var(--muted); padding: 2px; }
+
+    /* ── Day view ── */
+    .day-schedule { max-width: 640px; }
+    .day-slot { display: flex; gap: 16px; margin-bottom: 4px; min-height: 52px; }
+    .day-time { width: 54px; text-align: right; font-size: 11px; color: var(--muted); padding-top: 4px; flex-shrink: 0; }
+    .day-line { width: 1px; background: var(--border); flex-shrink: 0; position: relative; }
+    .day-line::before { content: ''; position: absolute; top: 6px; left: -3px; width: 7px; height: 7px; border-radius: 50%; background: var(--border); }
+    .day-classes { flex: 1; padding-bottom: 8px; }
+    .day-class-card {
+      background: var(--card); border-radius: 8px; padding: 12px 14px;
+      margin-bottom: 8px; border-left: 4px solid; cursor: pointer; transition: all .15s;
+    }
+    .day-class-card:hover { transform: translateX(3px); }
+    .dcc-top { display: flex; justify-content: space-between; align-items: flex-start; }
+    .dcc-name { font-size: 15px; font-weight: 700; }
+    .dcc-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
+    .dcc-badges { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+    .dcc-badge { font-size: 10px; padding: 2px 8px; border-radius: 10px; background: var(--border); color: var(--muted); }
+
+    /* ── Modals ── */
+    .overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 100; padding: 20px; opacity: 0; pointer-events: none; transition: opacity .2s;
+    }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .modal {
+      background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+      width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+      transform: translateY(20px); transition: transform .2s;
+    }
+    .overlay.open .modal { transform: translateY(0); }
+    .modal-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 20px 24px; border-bottom: 1px solid var(--border);
+    }
+    .modal-title { font-size: 18px; font-weight: 700; }
+    .modal-close { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 22px; line-height: 1; padding: 0 4px; }
+    .modal-close:hover { color: var(--text); }
+    .modal-body { padding: 24px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 14px; }
+    .form-group { margin-bottom: 14px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); letter-spacing: .5px; display: block; margin-bottom: 6px; text-transform: uppercase; }
+    .form-group input, .form-group select, .form-group textarea {
+      width: 100%; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); padding: 9px 12px; border-radius: 6px; font-size: 14px;
+      transition: border-color .15s; outline: none;
+    }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--accent); }
+    .form-group textarea { resize: vertical; min-height: 70px; }
+    .days-check { display: flex; flex-wrap: wrap; gap: 8px; }
+    .day-check { display: flex; align-items: center; gap: 5px; }
+    .day-check input { accent-color: var(--accent); }
+    .day-check label { font-size: 12px; cursor: pointer; }
+    .modal-footer {
+      display: flex; justify-content: flex-end; gap: 10px;
+      padding: 16px 24px; border-top: 1px solid var(--border);
+    }
+    .btn-cancel { background: none; border: 1px solid var(--border); color: var(--muted); padding: 9px 20px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-cancel:hover { border-color: var(--text); color: var(--text); }
+    .btn-save { background: var(--accent); border: none; color: #fff; padding: 9px 24px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 700; }
+    .btn-save:hover { background: var(--accent2); }
+    .btn-delete { background: none; border: 1px solid #550000; color: #e53935; padding: 9px 18px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: 600; margin-right: auto; }
+    .btn-delete:hover { background: #3a0a0a; }
+
+    /* Detail modal */
+    .detail-color-bar { height: 6px; border-radius: 6px 6px 0 0; }
+    .detail-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+    .detail-item .di-label { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+    .detail-item .di-value { font-size: 15px; font-weight: 600; }
+    .detail-desc { font-size: 14px; color: var(--muted); line-height: 1.6; background: var(--surface); padding: 12px; border-radius: 6px; }
+
+    .empty-day { text-align: center; color: var(--muted); padding: 40px 0; font-size: 14px; }
+
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .form-row { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-icon">🥋</span>
+    <span class="logo-text">Dragon <span>Dojo</span></span>
+  </div>
+  <nav>
+    <button class="nav-btn" id="btn-month">Month</button>
+    <button class="nav-btn active" id="btn-week">Week</button>
+    <button class="nav-btn" id="btn-day">Day</button>
+  </nav>
+  <button class="btn-add" id="btn-new">＋ Add Class</button>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="mini-cal">
+      <div class="mini-cal-header">
+        <button class="mini-nav" id="mini-prev">‹</button>
+        <span class="mini-cal-title" id="mini-title"></span>
+        <button class="mini-nav" id="mini-next">›</button>
+      </div>
+      <div class="mini-grid" id="mini-grid"></div>
+    </div>
+    <div class="filter-section">
+      <h3>Disciplines</h3>
+      <div id="filter-list"></div>
+    </div>
+    <div>
+      <h3>Level</h3>
+      <div style="margin-top:8px">
+        <div class="legend-item"><span class="level-badge lvl-beginner">BEGINNER</span></div>
+        <div class="legend-item"><span class="level-badge lvl-intermediate">INTERMEDIATE</span></div>
+        <div class="legend-item"><span class="level-badge lvl-advanced">ADVANCED</span></div>
+        <div class="legend-item"><span class="level-badge lvl-all">ALL LEVELS</span></div>
+      </div>
+    </div>
+  </aside>
+  <main class="main" id="main-content"></main>
+</div>
+
+<!-- ADD / EDIT MODAL -->
+<div class="overlay" id="form-overlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="form-title">New Class</span>
+      <button class="modal-close" id="form-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-row">
+        <div class="form-group"><label>Class Name</label><input type="text" id="f-name" placeholder="e.g. Morning Karate" /></div>
+        <div class="form-group"><label>Discipline</label>
+          <select id="f-discipline">
+            <option value="karate">Karate</option><option value="judo">Judo</option>
+            <option value="bjj">Brazilian Jiu-Jitsu</option><option value="kickboxing">Kickboxing</option>
+            <option value="taichi">Tai Chi</option><option value="muaythai">Muay Thai</option>
+            <option value="wrestling">Wrestling</option><option value="kendo">Kendo</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Instructor</label><input type="text" id="f-instructor" placeholder="Instructor name" /></div>
+        <div class="form-group"><label>Level</label>
+          <select id="f-level">
+            <option value="Beginner">Beginner</option><option value="Intermediate">Intermediate</option>
+            <option value="Advanced">Advanced</option><option value="All Levels">All Levels</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Start Time</label><input type="time" id="f-start" /></div>
+        <div class="form-group"><label>Duration (min)</label><input type="number" id="f-duration" value="60" min="15" max="480" step="15" /></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Max Capacity</label><input type="number" id="f-capacity" value="20" min="1" max="100" /></div>
+        <div class="form-group"><label>Room / Mat</label><input type="text" id="f-room" placeholder="e.g. Main Dojo" /></div>
+      </div>
+      <div class="form-group">
+        <label>Repeats On</label>
+        <div class="days-check" id="f-days">
+          <div class="day-check"><input type="checkbox" id="d0" value="0"><label for="d0">Sun</label></div>
+          <div class="day-check"><input type="checkbox" id="d1" value="1"><label for="d1">Mon</label></div>
+          <div class="day-check"><input type="checkbox" id="d2" value="2"><label for="d2">Tue</label></div>
+          <div class="day-check"><input type="checkbox" id="d3" value="3"><label for="d3">Wed</label></div>
+          <div class="day-check"><input type="checkbox" id="d4" value="4"><label for="d4">Thu</label></div>
+          <div class="day-check"><input type="checkbox" id="d5" value="5"><label for="d5">Fri</label></div>
+          <div class="day-check"><input type="checkbox" id="d6" value="6"><label for="d6">Sat</label></div>
+        </div>
+      </div>
+      <div class="form-group"><label>Notes</label><textarea id="f-notes" placeholder="Class description, equipment needed, etc."></textarea></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-delete" id="btn-delete" style="display:none">Delete</button>
+      <button class="btn-cancel" id="btn-cancel">Cancel</button>
+      <button class="btn-save" id="btn-save">Save Class</button>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL MODAL -->
+<div class="overlay" id="detail-overlay">
+  <div class="modal">
+    <div class="detail-color-bar" id="detail-bar"></div>
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="detail-name"></div>
+        <div style="font-size:12px;color:var(--muted);margin-top:3px" id="detail-disc"></div>
+      </div>
+      <button class="modal-close" id="detail-close">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="detail-grid" id="detail-grid"></div>
+      <div class="detail-desc" id="detail-notes" style="display:none"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn-cancel" id="detail-edit-btn">Edit</button>
+      <button class="btn-cancel" id="detail-dismiss">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────
+const DISC_LABELS = {
+  karate:'Karate', judo:'Judo', bjj:'Brazilian Jiu-Jitsu',
+  kickboxing:'Kickboxing', taichi:'Tai Chi', muaythai:'Muay Thai',
+  wrestling:'Wrestling', kendo:'Kendo'
+};
+const DISC_COLORS = {
+  karate:'#c62828', judo:'#1565c0', bjj:'#2e7d32',
+  kickboxing:'#e65100', taichi:'#6a1b9a', muaythai:'#bf360c',
+  wrestling:'#33691e', kendo:'#006064'
+};
+const LEVEL_CLASS = {
+  'Beginner':'lvl-beginner','Intermediate':'lvl-intermediate',
+  'Advanced':'lvl-advanced','All Levels':'lvl-all'
+};
+
+let classes = [
+  { id:1,  name:'Morning Karate',     discipline:'karate',    instructor:'Sensei Yamamoto', level:'All Levels',  start:'07:00', duration:60,  capacity:20, room:'Main Dojo',   days:[1,3,5], notes:'Traditional Shotokan Karate. Gi required.' },
+  { id:2,  name:'Kids Judo',          discipline:'judo',      instructor:'Coach Tanaka',    level:'Beginner',    start:'16:00', duration:60,  capacity:15, room:'Side Mat',    days:[2,4],   notes:'Ages 6–12. Uniform provided for first class.' },
+  { id:3,  name:'BJJ Fundamentals',   discipline:'bjj',       instructor:'Prof. Almeida',   level:'Beginner',    start:'18:00', duration:90,  capacity:20, room:'Main Dojo',   days:[1,3],   notes:'Focus on guard, mount, and back control basics.' },
+  { id:4,  name:'Advanced BJJ',       discipline:'bjj',       instructor:'Prof. Almeida',   level:'Advanced',    start:'20:00', duration:90,  capacity:12, room:'Main Dojo',   days:[2,5],   notes:'Rolling and advanced submissions. Blue belt minimum.' },
+  { id:5,  name:'Kickboxing Cardio',  discipline:'kickboxing',instructor:'Coach Rivera',    level:'All Levels',  start:'09:00', duration:60,  capacity:25, room:'Cardio Room', days:[0,2,4,6],notes:'High-energy class. Gloves required.' },
+  { id:6,  name:'Tai Chi Morning',    discipline:'taichi',    instructor:'Master Chen',     level:'All Levels',  start:'08:00', duration:60,  capacity:20, room:'Bamboo Room', days:[0,3,6], notes:'Yang style form. All ages welcome.' },
+  { id:7,  name:'Muay Thai Basics',   discipline:'muaythai',  instructor:'Kru Somchai',     level:'Beginner',    start:'17:30', duration:75,  capacity:16, room:'Cardio Room', days:[1,4],   notes:'Thai boxing fundamentals. Shin guards and gloves needed.' },
+  { id:8,  name:'Competition MT',     discipline:'muaythai',  instructor:'Kru Somchai',     level:'Advanced',    start:'19:30', duration:90,  capacity:10, room:'Cardio Room', days:[3,6],   notes:'Sparring and competition prep. Invitation only.' },
+  { id:9,  name:'Kendo Intro',        discipline:'kendo',     instructor:'Sensei Kobayashi',level:'Beginner',    start:'15:00', duration:90,  capacity:18, room:'Kendo Hall',  days:[0,3],   notes:'Introduction to Kendo. Shinai provided.' },
+  { id:10, name:'Wrestling Drills',   discipline:'wrestling', instructor:'Coach Brody',     level:'Intermediate',start:'06:30', duration:90,  capacity:14, room:'Main Dojo',   days:[2,5],   notes:'Takedowns, ties, and mat wrestling.' },
+  { id:11, name:'Karate Kids',        discipline:'karate',    instructor:'Sensei Yamamoto', level:'Beginner',    start:'15:30', duration:60,  capacity:18, room:'Side Mat',    days:[1,3,5], notes:'Ages 5–12. Fun and structured kata practice.' },
+  { id:12, name:'Judo Adults',        discipline:'judo',      instructor:'Coach Tanaka',    level:'Intermediate',start:'19:00', duration:90,  capacity:20, room:'Main Dojo',   days:[1,4,6], notes:'Nage-waza and ne-waza focus. White belt and above.' },
+];
+let nextId = 13;
+
+let visibleDisc = new Set(Object.keys(DISC_LABELS));
+let currentView = 'week';
+let today = new Date(); today.setHours(0,0,0,0);
+let selectedDate = new Date(today);
+let miniDate = new Date(today.getFullYear(), today.getMonth(), 1);
+let editingId = null;
+
+// ─────────────────────────────────────────────
+//  UTILITIES
+// ─────────────────────────────────────────────
+const pad = n => String(n).padStart(2,'0');
+function fmtTime(t) {
+  const [h,m] = t.split(':').map(Number);
+  const ap = h >= 12 ? 'PM' : 'AM';
+  return `${((h-1+12)%12+1)}:${pad(m)} ${ap}`;
+}
+function fmtDuration(min) {
+  return min >= 60 ? `${Math.floor(min/60)}h${min%60 ? ` ${min%60}m` : ''}` : `${min}m`;
+}
+function timeToMins(t) { const [h,m] = t.split(':').map(Number); return h*60+m; }
+function addMins(t, m) {
+  let total = timeToMins(t) + m;
+  return `${pad(Math.floor(total/60)%24)}:${pad(total%60)}`;
+}
+function minsToTime(m) { return `${pad(Math.floor(m/60)%24)}:${pad(m%60)}`; }
+function snapMins(m, snap=15) { return Math.round(m/snap)*snap; }
+function getWeekStart(d) {
+  const dt = new Date(d); dt.setDate(dt.getDate()-dt.getDay()); dt.setHours(0,0,0,0); return dt;
+}
+function sameDay(a,b) { return a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+const MONTHS     = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const DAYS       = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function classesForDay(date) {
+  const dow = date.getDay();
+  return classes.filter(c => c.days.includes(dow) && visibleDisc.has(c.discipline));
+}
+function classesForDaySorted(date) {
+  return classesForDay(date).sort((a,b) => timeToMins(a.start) - timeToMins(b.start));
+}
+
+// ─────────────────────────────────────────────
+//  WEEK VIEW CONSTANTS
+// ─────────────────────────────────────────────
+const HOUR_START = 6, HOUR_END = 23, CELL_H = 52;
+const TOTAL_MINS = (HOUR_END - HOUR_START) * 60;
+const TOTAL_PX   = TOTAL_MINS / 60 * CELL_H;
+
+function minsToPx(m) { return m / 60 * CELL_H; }
+function pxToMins(px) { return px / CELL_H * 60; }
+
+// ─────────────────────────────────────────────
+//  MINI CALENDAR
+// ─────────────────────────────────────────────
+function renderMini() {
+  document.getElementById('mini-title').textContent = `${MONTHS[miniDate.getMonth()].slice(0,3)} ${miniDate.getFullYear()}`;
+  const grid = document.getElementById('mini-grid');
+  grid.innerHTML = DAYS_SHORT.map(d=>`<div class="mini-dow">${d[0]}</div>`).join('');
+
+  const first    = new Date(miniDate.getFullYear(), miniDate.getMonth(), 1);
+  const startDow = first.getDay();
+  const daysInMonth = new Date(miniDate.getFullYear(), miniDate.getMonth()+1, 0).getDate();
+  const prevDays = new Date(miniDate.getFullYear(), miniDate.getMonth(), 0).getDate();
+
+  for(let i=startDow-1; i>=0; i--) {
+    grid.insertAdjacentHTML('beforeend', miniDayHTML(new Date(miniDate.getFullYear(), miniDate.getMonth()-1, prevDays-i), true));
+  }
+  for(let i=1; i<=daysInMonth; i++) {
+    grid.insertAdjacentHTML('beforeend', miniDayHTML(new Date(miniDate.getFullYear(), miniDate.getMonth(), i), false));
+  }
+  const totalCells = Math.ceil((startDow+daysInMonth)/7)*7;
+  for(let i=1; i<=totalCells-startDow-daysInMonth; i++) {
+    grid.insertAdjacentHTML('beforeend', miniDayHTML(new Date(miniDate.getFullYear(), miniDate.getMonth()+1, i), true));
+  }
+  grid.querySelectorAll('.mini-day').forEach(el => {
+    el.addEventListener('click', () => { selectedDate = new Date(parseInt(el.dataset.ts)); render(); });
+  });
+}
+function miniDayHTML(d, other) {
+  const isTod = sameDay(d, today), isSel = sameDay(d, selectedDate);
+  const hasCls = classesForDay(d).length > 0;
+  let cls = 'mini-day';
+  if(other) cls += ' other-month';
+  if(isTod)  cls += ' today';
+  if(isSel && !isTod) cls += ' selected';
+  if(hasCls) cls += ' has-class';
+  return `<div class="${cls}" data-ts="${d.getTime()}">${d.getDate()}</div>`;
+}
+
+// ─────────────────────────────────────────────
+//  FILTERS
+// ─────────────────────────────────────────────
+function renderFilters() {
+  const el = document.getElementById('filter-list');
+  el.innerHTML = Object.entries(DISC_LABELS).map(([k,v]) => {
+    const count = classes.filter(c => c.discipline===k).length;
+    return `<label class="filter-item">
+      <input type="checkbox" data-disc="${k}" ${visibleDisc.has(k)?'checked':''} />
+      <span class="filter-dot" style="background:${DISC_COLORS[k]}"></span>
+      <span class="filter-label">${v}</span>
+      <span class="filter-count">${count}</span>
+    </label>`;
+  }).join('');
+  el.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      if(cb.checked) visibleDisc.add(cb.dataset.disc);
+      else visibleDisc.delete(cb.dataset.disc);
+      render();
+    });
+  });
+}
+
+// ─────────────────────────────────────────────
+//  WEEK VIEW — RENDER
+// ─────────────────────────────────────────────
+function renderWeek() {
+  const ws   = getWeekStart(selectedDate);
+  const days = Array.from({length:7}, (_,i) => { const d=new Date(ws); d.setDate(d.getDate()+i); return d; });
+  const main = document.getElementById('main-content');
+
+  const rangeStr = (() => {
+    const s=days[0], e=days[6];
+    if(s.getMonth()===e.getMonth()) return `${MONTHS[s.getMonth()]} ${s.getDate()}–${e.getDate()}, ${s.getFullYear()}`;
+    return `${MONTHS[s.getMonth()]} ${s.getDate()} – ${MONTHS[e.getMonth()]} ${e.getDate()}, ${e.getFullYear()}`;
+  })();
+
+  // Build header HTML
+  let html = `
+  <div class="week-header">
+    <div class="week-title">${rangeStr.replace(/(\w+\s[\d–]+),\s/,'<span>$1</span>, ')}</div>
+    <div class="week-controls">
+      <button class="ctrl-btn" id="wk-prev">‹</button>
+      <button class="today-btn" id="wk-today">Today</button>
+      <button class="ctrl-btn" id="wk-next">›</button>
+    </div>
+  </div>
+  <div class="drag-hint">
+    <span>✥ Drag</span> to move a class &nbsp;
+    <span>↕ Drag bottom edge</span> to resize duration
+  </div>
+  <div class="wk-wrapper">
+    <div class="wk-header">
+      <div class="wk-corner"></div>`;
+
+  days.forEach(d => {
+    const isTod = sameDay(d, today);
+    html += `<div class="wk-day-hdr${isTod?' today-col':''}">
+      <div class="wk-dow">${DAYS_SHORT[d.getDay()]}</div>
+      <div class="wk-date-num">${d.getDate()}</div>
+    </div>`;
+  });
+  html += `</div><!-- /wk-header -->
+    <div class="wk-body-scroll">
+      <div class="wk-body">
+        <div class="wk-time-col">`;
+
+  for(let h=HOUR_START; h<HOUR_END; h++) {
+    html += `<div class="wk-time-lbl">${fmtTime(h+':00')}</div>`;
+  }
+  html += `</div><!-- /wk-time-col -->
+        <div class="wk-cols" id="wk-cols">`;
+
+  days.forEach(d => {
+    html += `<div class="wk-day-col" data-col-dow="${d.getDay()}" data-col-ts="${d.getTime()}">`;
+    for(let h=HOUR_START; h<HOUR_END; h++) {
+      html += `<div class="wk-bg-cell"></div>`;
+      // half-hour dashed line
+      html += `<div class="wk-bg-half" style="top:${minsToPx((h-HOUR_START)*60+30)}px"></div>`;
+    }
+    html += `</div>`;
+  });
+
+  html += `</div><!-- /wk-cols -->
+      </div><!-- /wk-body -->
+    </div><!-- /wk-body-scroll -->
+  </div><!-- /wk-wrapper -->`;
+
+  main.innerHTML = html;
+
+  // Attach nav listeners
+  document.getElementById('wk-prev').addEventListener('click',  () => { selectedDate.setDate(selectedDate.getDate()-7); render(); });
+  document.getElementById('wk-next').addEventListener('click',  () => { selectedDate.setDate(selectedDate.getDate()+7); render(); });
+  document.getElementById('wk-today').addEventListener('click', () => { selectedDate = new Date(today); render(); });
+
+  // Place class blocks
+  days.forEach(d => {
+    const col = main.querySelector(`.wk-day-col[data-col-ts="${d.getTime()}"]`);
+    if(!col) return;
+    classesForDaySorted(d).forEach(cls => placeBlock(col, cls, d));
+  });
+}
+
+function placeBlock(col, cls, date) {
+  const startMins = timeToMins(cls.start);
+  const endMins   = startMins + cls.duration;
+  if(startMins >= HOUR_END*60 || endMins <= HOUR_START*60) return;
+
+  const topMins  = Math.max(startMins, HOUR_START*60) - HOUR_START*60;
+  const botMins  = Math.min(endMins,   HOUR_END*60)   - HOUR_START*60;
+  const topPx    = minsToPx(topMins);
+  const heightPx = Math.max(minsToPx(botMins - topMins), 18);
+
+  const block = document.createElement('div');
+  block.className = `class-block cb-${cls.discipline}`;
+  block.dataset.id  = cls.id;
+  block.dataset.dow = date.getDay();
+  block.style.cssText = `top:${topPx}px; height:${heightPx}px;`;
+
+  block.innerHTML = buildBlockInner(cls, heightPx);
+
+  // Click to open detail (only if not dragged)
+  block.dataset.clickable = 'true';
+
+  attachBlockHandlers(block, cls.id, date.getDay());
+  col.appendChild(block);
+}
+
+function buildBlockInner(cls, heightPx) {
+  const endTime = fmtTime(addMins(cls.start, cls.duration));
+  return `<div class="cb-body" title="${cls.name} — ${fmtTime(cls.start)}">
+    <div class="cb-name">${cls.name}</div>
+    ${heightPx > 32 ? `<div class="cb-sub">${cls.instructor}</div>` : ''}
+    ${heightPx > 48 ? `<div class="cb-time">${fmtTime(cls.start)} – ${endTime}</div>` : ''}
+  </div>
+  <div class="resize-handle"></div>`;
+}
+
+// ─────────────────────────────────────────────
+//  DRAG & DROP
+// ─────────────────────────────────────────────
+let drag = null;
+let dragGhost = null;
+let dragTooltip = null;
+
+function attachBlockHandlers(block, classId, sourceDow) {
+  const body   = block.querySelector('.cb-body');
+  const handle = block.querySelector('.resize-handle');
+
+  body.addEventListener('mousedown', e => {
+    if(e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    startMoveDrag(e, classId, block, sourceDow);
+  });
+
+  handle.addEventListener('mousedown', e => {
+    if(e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    startResizeDrag(e, classId, block);
+  });
+}
+
+function getColsRect() {
+  const el = document.getElementById('wk-cols');
+  return el ? el.getBoundingClientRect() : null;
+}
+
+function getColDivs() {
+  return [...document.querySelectorAll('.wk-day-col')];
+}
+
+function getColAtX(x) {
+  return getColDivs().find(col => {
+    const r = col.getBoundingClientRect();
+    return x >= r.left && x < r.right;
+  }) || null;
+}
+
+function getTimeFromY(clientY) {
+  const colsEl = document.getElementById('wk-cols');
+  if(!colsEl) return HOUR_START * 60;
+  const r = colsEl.getBoundingClientRect();
+  const relY = clientY - r.top;
+  const rawMins = HOUR_START*60 + pxToMins(relY);
+  return Math.max(HOUR_START*60, Math.min(HOUR_END*60 - 15, snapMins(rawMins, 15)));
+}
+
+// ── MOVE ──
+function startMoveDrag(e, classId, block, sourceDow) {
+  const cls = classes.find(c => c.id === classId);
+  if(!cls) return;
+
+  const rect    = block.getBoundingClientRect();
+  const offsetY = e.clientY - rect.top;   // click point within block
+  const offsetX = e.clientX - rect.left;
+
+  // Ghost follows cursor
+  dragGhost = document.createElement('div');
+  dragGhost.className = `drag-ghost cb-${cls.discipline}`;
+  dragGhost.style.width  = Math.max(rect.width, 80) + 'px';
+  dragGhost.style.height = rect.height + 'px';
+  dragGhost.innerHTML = `<div class="cb-name">${cls.name}</div><div class="cb-sub">${cls.instructor}</div>`;
+  document.body.appendChild(dragGhost);
+
+  // Time tooltip
+  dragTooltip = document.createElement('div');
+  dragTooltip.className = 'drag-tooltip';
+  document.body.appendChild(dragTooltip);
+
+  block.classList.add('dragging');
+
+  drag = { type:'move', classId, block, sourceDow, offsetY, offsetX, hasMoved: false };
+
+  positionGhost(e);
+  updateTooltip(cls.start);
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+}
+
+function positionGhost(e) {
+  if(!dragGhost) return;
+  dragGhost.style.left = (e.clientX - drag.offsetX) + 'px';
+  dragGhost.style.top  = (e.clientY - drag.offsetY) + 'px';
+  // tooltip just above cursor
+  dragTooltip.style.left = (e.clientX + 14) + 'px';
+  dragTooltip.style.top  = (e.clientY - 28) + 'px';
+}
+
+function updateTooltip(startTime, duration) {
+  if(!dragTooltip) return;
+  if(duration !== undefined) {
+    const end = fmtTime(addMins(startTime, duration));
+    dragTooltip.textContent = `${fmtTime(startTime)} – ${end}  (${fmtDuration(duration)})`;
+  } else {
+    dragTooltip.textContent = fmtTime(startTime);
+  }
+}
+
+// ── RESIZE ──
+function startResizeDrag(e, classId, block) {
+  const cls = classes.find(c => c.id === classId);
+  if(!cls) return;
+
+  dragTooltip = document.createElement('div');
+  dragTooltip.className = 'drag-tooltip';
+  document.body.appendChild(dragTooltip);
+
+  block.classList.add('resizing');
+  updateTooltip(cls.start, cls.duration);
+
+  drag = {
+    type: 'resize', classId, block,
+    startY: e.clientY,
+    origDuration: cls.duration,
+    origStart: cls.start,
+    hasMoved: false
+  };
+
+  document.addEventListener('mousemove', onMouseMove);
+  document.addEventListener('mouseup',   onMouseUp);
+}
+
+// ── SHARED MOUSE HANDLERS ──
+function onMouseMove(e) {
+  if(!drag) return;
+  drag.hasMoved = true;
+
+  if(drag.type === 'move') {
+    positionGhost(e);
+
+    // Highlight target column
+    getColDivs().forEach(c => c.classList.remove('drop-target'));
+    const targetCol = getColAtX(e.clientX);
+    if(targetCol) targetCol.classList.add('drop-target');
+
+    // Show snap line in target col
+    document.querySelectorAll('.snap-line').forEach(l => l.remove());
+    if(targetCol) {
+      const snapMinsVal = getTimeFromY(e.clientY - drag.offsetY) - HOUR_START*60;
+      const line = document.createElement('div');
+      line.className = 'snap-line';
+      line.style.top = minsToPx(snapMinsVal) + 'px';
+      targetCol.appendChild(line);
+    }
+
+    // Update tooltip
+    const newStart = minsToTime(getTimeFromY(e.clientY - drag.offsetY));
+    updateTooltip(newStart);
+    dragTooltip.style.left = (e.clientX + 14) + 'px';
+    dragTooltip.style.top  = (e.clientY - 28) + 'px';
+
+  } else if(drag.type === 'resize') {
+    const deltaY    = e.clientY - drag.startY;
+    const deltaMins = snapMins(pxToMins(deltaY), 15);
+    const newDur    = Math.max(15, drag.origDuration + deltaMins);
+
+    drag.block.style.height = minsToPx(newDur) + 'px';
+
+    // Rebuild inner content with new height
+    const cls = classes.find(c => c.id === drag.classId);
+    if(cls) {
+      drag.block.querySelector('.cb-body').innerHTML =
+        `<div class="cb-name">${cls.name}</div>
+         ${minsToPx(newDur)>32 ? `<div class="cb-sub">${cls.instructor}</div>` : ''}
+         ${minsToPx(newDur)>48 ? `<div class="cb-time">${fmtTime(cls.start)} – ${fmtTime(addMins(cls.start, newDur))}</div>` : ''}`;
+    }
+
+    updateTooltip(drag.origStart, newDur);
+    dragTooltip.style.left = (e.clientX + 14) + 'px';
+    dragTooltip.style.top  = (e.clientY - 28) + 'px';
+  }
+}
+
+function onMouseUp(e) {
+  if(!drag) return;
+
+  document.removeEventListener('mousemove', onMouseMove);
+  document.removeEventListener('mouseup',   onMouseUp);
+
+  // Clean up drop highlights & snap lines
+  getColDivs().forEach(c => c.classList.remove('drop-target'));
+  document.querySelectorAll('.snap-line').forEach(l => l.remove());
+
+  // Clean up ghost & tooltip
+  if(dragGhost)   { dragGhost.remove();   dragGhost = null; }
+  if(dragTooltip) { dragTooltip.remove(); dragTooltip = null; }
+
+  const cls = classes.find(c => c.id === drag.classId);
+
+  if(drag.type === 'move') {
+    drag.block.classList.remove('dragging');
+
+    if(drag.hasMoved && cls) {
+      const targetCol  = getColAtX(e.clientX);
+      const newTimeMins = getTimeFromY(e.clientY - drag.offsetY);
+      const newStart   = minsToTime(newTimeMins);
+
+      if(targetCol) {
+        const newDow = parseInt(targetCol.dataset.colDow);
+        cls.start = newStart;
+
+        // Update days: swap source DOW for target DOW if different
+        if(drag.sourceDow !== newDow) {
+          const idx = cls.days.indexOf(drag.sourceDow);
+          if(idx !== -1) cls.days.splice(idx, 1);
+          if(!cls.days.includes(newDow)) cls.days.push(newDow);
+          cls.days.sort();
+        }
+
+        render(); renderMini(); renderFilters();
+        return; // skip click
+      }
+    }
+
+    // No move or dropped outside — it was a click → open detail
+    if(!drag.hasMoved) openDetail(drag.classId);
+
+  } else if(drag.type === 'resize') {
+    drag.block.classList.remove('resizing');
+
+    if(drag.hasMoved && cls) {
+      const deltaY    = e.clientY - drag.startY;
+      const deltaMins = snapMins(pxToMins(deltaY), 15);
+      const newDur    = Math.max(15, drag.origDuration + deltaMins);
+      cls.duration = newDur;
+      render(); renderMini();
+    }
+  }
+
+  drag = null;
+}
+
+// ─────────────────────────────────────────────
+//  MONTH VIEW
+// ─────────────────────────────────────────────
+function renderMonth() {
+  const yr=selectedDate.getFullYear(), mo=selectedDate.getMonth();
+  const first=new Date(yr,mo,1), last=new Date(yr,mo+1,0);
+  const main=document.getElementById('main-content');
+
+  let html = `<div class="week-header">
+    <div class="week-title">${MONTHS[mo]} <span>${yr}</span></div>
+    <div class="week-controls">
+      <button class="ctrl-btn" id="mo-prev">‹</button>
+      <button class="today-btn" id="mo-today">Today</button>
+      <button class="ctrl-btn" id="mo-next">›</button>
+    </div>
+  </div>
+  <div class="month-grid">
+    ${DAYS_SHORT.map(d=>`<div class="month-dow-header">${d}</div>`).join('')}`;
+
+  for(let i=0; i<first.getDay(); i++) {
+    html += monthCell(new Date(yr, mo, -first.getDay()+i+1), true);
+  }
+  for(let i=1; i<=last.getDate(); i++) {
+    html += monthCell(new Date(yr,mo,i), false);
+  }
+  const trailing = 6 - last.getDay();
+  for(let i=1; i<=trailing; i++) html += monthCell(new Date(yr,mo+1,i), true);
+  html += '</div>';
+  main.innerHTML = html;
+
+  main.querySelectorAll('.month-cell').forEach(el => {
+    el.addEventListener('click', () => {
+      selectedDate = new Date(parseInt(el.dataset.ts));
+      currentView = 'day';
+      document.getElementById('btn-day').click();
+    });
+  });
+  main.querySelectorAll('.mc-class-pill').forEach(el => {
+    el.addEventListener('click', e => { e.stopPropagation(); openDetail(parseInt(el.dataset.id)); });
+  });
+  document.getElementById('mo-prev').addEventListener('click',  () => { selectedDate=new Date(yr,mo-1,1); render(); });
+  document.getElementById('mo-next').addEventListener('click',  () => { selectedDate=new Date(yr,mo+1,1); render(); });
+  document.getElementById('mo-today').addEventListener('click', () => { selectedDate=new Date(today); render(); });
+}
+function monthCell(d, other) {
+  const isTod=sameDay(d,today), isSel=sameDay(d,selectedDate);
+  let cls = 'month-cell';
+  if(other)  cls += ' other-month';
+  if(isTod)  cls += ' today-cell';
+  if(isSel && !other) cls += ' selected-cell';
+
+  const list   = classesForDaySorted(d);
+  const shown  = list.slice(0, 3);
+  const more   = list.length - 3;
+  const pills  = shown.map(c=>`<div class="mc-class-pill cb-${c.discipline}" data-id="${c.id}">${c.name}</div>`).join('');
+  const moreTxt= more > 0 ? `<div class="mc-more">+${more} more</div>` : '';
+  return `<div class="${cls}" data-ts="${d.getTime()}">
+    <div class="mc-date">${d.getDate()}</div>
+    ${pills}${moreTxt}
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+//  DAY VIEW
+// ─────────────────────────────────────────────
+function renderDay() {
+  const main    = document.getElementById('main-content');
+  const clsList = classesForDaySorted(selectedDate);
+  const dayName = `${DAYS[selectedDate.getDay()]}, ${MONTHS[selectedDate.getMonth()]} ${selectedDate.getDate()}, ${selectedDate.getFullYear()}`;
+
+  let html = `<div class="week-header">
+    <div class="week-title">${dayName.replace(/(\w+, )/,'<span>$1</span>')}</div>
+    <div class="week-controls">
+      <button class="ctrl-btn" id="dy-prev">‹</button>
+      <button class="today-btn" id="dy-today">Today</button>
+      <button class="ctrl-btn" id="dy-next">›</button>
+    </div>
+  </div>
+  <div class="day-schedule">`;
+
+  if(!clsList.length) {
+    html += `<div class="empty-day">No classes scheduled for this day.<br>
+      <button class="btn-add" style="margin-top:16px;display:inline-flex" id="dy-add-empty">＋ Add Class</button></div>`;
+  } else {
+    clsList.forEach(c => {
+      html += `<div class="day-slot">
+        <div class="day-time">${fmtTime(c.start)}</div>
+        <div class="day-line"></div>
+        <div class="day-classes">
+          <div class="day-class-card" style="border-left-color:${DISC_COLORS[c.discipline]}" data-id="${c.id}">
+            <div class="dcc-top">
+              <div class="dcc-name">${c.name}</div>
+              <span class="level-badge ${LEVEL_CLASS[c.level]}">${c.level.toUpperCase()}</span>
+            </div>
+            <div class="dcc-meta">${fmtTime(c.start)} — ${fmtTime(addMins(c.start,c.duration))} · ${fmtDuration(c.duration)} · ${c.instructor}</div>
+            <div class="dcc-badges">
+              <span class="dcc-badge">🥋 ${DISC_LABELS[c.discipline]}</span>
+              <span class="dcc-badge">📍 ${c.room}</span>
+              <span class="dcc-badge">👥 Max ${c.capacity}</span>
+            </div>
+          </div>
+        </div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+  main.innerHTML = html;
+
+  main.querySelectorAll('.day-class-card').forEach(el => {
+    el.addEventListener('click', () => openDetail(parseInt(el.dataset.id)));
+  });
+  document.getElementById('dy-prev')?.addEventListener('click',  () => { selectedDate.setDate(selectedDate.getDate()-1); render(); });
+  document.getElementById('dy-next')?.addEventListener('click',  () => { selectedDate.setDate(selectedDate.getDate()+1); render(); });
+  document.getElementById('dy-today')?.addEventListener('click', () => { selectedDate=new Date(today); render(); });
+  document.getElementById('dy-add-empty')?.addEventListener('click', () => openForm());
+}
+
+// ─────────────────────────────────────────────
+//  DETAIL MODAL
+// ─────────────────────────────────────────────
+let detailId = null;
+function openDetail(id) {
+  const c = classes.find(x => x.id===id); if(!c) return;
+  detailId = id;
+  document.getElementById('detail-bar').style.background = DISC_COLORS[c.discipline];
+  document.getElementById('detail-name').textContent = c.name;
+  document.getElementById('detail-disc').textContent = DISC_LABELS[c.discipline];
+
+  const daysStr = c.days.slice().sort().map(d=>DAYS_SHORT[d]).join(', ');
+  document.getElementById('detail-grid').innerHTML = `
+    <div class="detail-item"><div class="di-label">Instructor</div><div class="di-value">${c.instructor}</div></div>
+    <div class="detail-item"><div class="di-label">Level</div><div class="di-value"><span class="level-badge ${LEVEL_CLASS[c.level]}">${c.level.toUpperCase()}</span></div></div>
+    <div class="detail-item"><div class="di-label">Time</div><div class="di-value">${fmtTime(c.start)} – ${fmtTime(addMins(c.start,c.duration))}</div></div>
+    <div class="detail-item"><div class="di-label">Duration</div><div class="di-value">${fmtDuration(c.duration)}</div></div>
+    <div class="detail-item"><div class="di-label">Room / Mat</div><div class="di-value">${c.room}</div></div>
+    <div class="detail-item"><div class="di-label">Capacity</div><div class="di-value">${c.capacity} students</div></div>
+    <div class="detail-item" style="grid-column:1/-1"><div class="di-label">Schedule</div><div class="di-value">${daysStr}</div></div>`;
+
+  const notesEl = document.getElementById('detail-notes');
+  if(c.notes) { notesEl.textContent=c.notes; notesEl.style.display='block'; }
+  else notesEl.style.display = 'none';
+
+  document.getElementById('detail-overlay').classList.add('open');
+}
+document.getElementById('detail-close').addEventListener('click',   () => document.getElementById('detail-overlay').classList.remove('open'));
+document.getElementById('detail-dismiss').addEventListener('click', () => document.getElementById('detail-overlay').classList.remove('open'));
+document.getElementById('detail-overlay').addEventListener('click', e => { if(e.target===e.currentTarget) e.currentTarget.classList.remove('open'); });
+document.getElementById('detail-edit-btn').addEventListener('click', () => {
+  document.getElementById('detail-overlay').classList.remove('open');
+  openForm(detailId);
+});
+
+// ─────────────────────────────────────────────
+//  FORM MODAL
+// ─────────────────────────────────────────────
+function openForm(id=null) {
+  editingId = id;
+  const delBtn = document.getElementById('btn-delete');
+  if(id) {
+    const c = classes.find(x => x.id===id);
+    document.getElementById('form-title').textContent = 'Edit Class';
+    document.getElementById('f-name').value       = c.name;
+    document.getElementById('f-discipline').value = c.discipline;
+    document.getElementById('f-instructor').value = c.instructor;
+    document.getElementById('f-level').value      = c.level;
+    document.getElementById('f-start').value      = c.start;
+    document.getElementById('f-duration').value   = c.duration;
+    document.getElementById('f-capacity').value   = c.capacity;
+    document.getElementById('f-room').value       = c.room;
+    document.getElementById('f-notes').value      = c.notes || '';
+    document.querySelectorAll('#f-days input').forEach(cb => { cb.checked = c.days.includes(parseInt(cb.value)); });
+    delBtn.style.display = 'block';
+  } else {
+    document.getElementById('form-title').textContent = 'New Class';
+    document.getElementById('f-name').value=''; document.getElementById('f-discipline').value='karate';
+    document.getElementById('f-instructor').value=''; document.getElementById('f-level').value='All Levels';
+    document.getElementById('f-start').value='09:00'; document.getElementById('f-duration').value=60;
+    document.getElementById('f-capacity').value=20; document.getElementById('f-room').value='Main Dojo';
+    document.getElementById('f-notes').value='';
+    document.querySelectorAll('#f-days input').forEach(cb => cb.checked=false);
+    delBtn.style.display = 'none';
+  }
+  document.getElementById('form-overlay').classList.add('open');
+}
+function closeForm() { document.getElementById('form-overlay').classList.remove('open'); }
+function saveForm() {
+  const name = document.getElementById('f-name').value.trim();
+  if(!name) { document.getElementById('f-name').focus(); return; }
+  const days = [...document.querySelectorAll('#f-days input:checked')].map(cb => parseInt(cb.value));
+  const data = {
+    name,
+    discipline: document.getElementById('f-discipline').value,
+    instructor: document.getElementById('f-instructor').value.trim() || 'TBD',
+    level:      document.getElementById('f-level').value,
+    start:      document.getElementById('f-start').value,
+    duration:   parseInt(document.getElementById('f-duration').value),
+    capacity:   parseInt(document.getElementById('f-capacity').value),
+    room:       document.getElementById('f-room').value.trim() || 'Main Dojo',
+    days,
+    notes:      document.getElementById('f-notes').value.trim()
+  };
+  if(editingId) Object.assign(classes.find(c=>c.id===editingId), data);
+  else          classes.push({ id: nextId++, ...data });
+  closeForm(); render(); renderFilters(); renderMini();
+}
+function deleteClass() {
+  if(!confirm('Delete this class? This cannot be undone.')) return;
+  classes = classes.filter(c => c.id !== editingId);
+  closeForm(); render(); renderFilters(); renderMini();
+}
+document.getElementById('btn-save').addEventListener('click', saveForm);
+document.getElementById('btn-cancel').addEventListener('click', closeForm);
+document.getElementById('form-close').addEventListener('click', closeForm);
+document.getElementById('btn-delete').addEventListener('click', deleteClass);
+document.getElementById('form-overlay').addEventListener('click', e => { if(e.target===e.currentTarget) closeForm(); });
+document.getElementById('btn-new').addEventListener('click', () => openForm());
+
+// ─────────────────────────────────────────────
+//  VIEW SWITCHING
+// ─────────────────────────────────────────────
+function setView(v) {
+  currentView = v;
+  ['month','week','day'].forEach(x => document.getElementById(`btn-${x}`).classList.toggle('active', x===v));
+  render();
+}
+document.getElementById('btn-month').addEventListener('click', () => setView('month'));
+document.getElementById('btn-week').addEventListener('click',  () => setView('week'));
+document.getElementById('btn-day').addEventListener('click',   () => setView('day'));
+
+document.getElementById('mini-prev').addEventListener('click', () => { miniDate=new Date(miniDate.getFullYear(),miniDate.getMonth()-1,1); renderMini(); });
+document.getElementById('mini-next').addEventListener('click', () => { miniDate=new Date(miniDate.getFullYear(),miniDate.getMonth()+1,1); renderMini(); });
+
+// ─────────────────────────────────────────────
+//  MAIN RENDER
+// ─────────────────────────────────────────────
+function render() {
+  renderMini();
+  if(currentView==='week')       renderWeek();
+  else if(currentView==='month') renderMonth();
+  else                           renderDay();
+}
+
+renderFilters();
+render();
+</script>
+</body>
+</html>
